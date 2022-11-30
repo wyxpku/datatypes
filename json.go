@@ -113,6 +113,7 @@ type JSONQueryExpression struct {
 	equalsValue interface{}
 	extract     bool
 	path        string
+	contains    bool
 }
 
 // JSONQuery query column as json
@@ -138,6 +139,13 @@ func (jsonQuery *JSONQueryExpression) HasKey(keys ...string) *JSONQueryExpressio
 func (jsonQuery *JSONQueryExpression) Equals(value interface{}, keys ...string) *JSONQueryExpression {
 	jsonQuery.keys = keys
 	jsonQuery.equals = true
+	jsonQuery.equalsValue = value
+	return jsonQuery
+}
+
+func (jsonQuery *JSONQueryExpression) Contains(value interface{}, keys ...string) *JSONQueryExpression {
+	jsonQuery.keys = keys
+	jsonQuery.contains = true
 	jsonQuery.equalsValue = value
 	return jsonQuery
 }
@@ -174,6 +182,20 @@ func (jsonQuery *JSONQueryExpression) Build(builder clause.Builder) {
 					} else {
 						stmt.AddVar(builder, jsonQuery.equalsValue)
 					}
+				}
+			case jsonQuery.contains:
+				if len(jsonQuery.keys) > 0 {
+					builder.WriteString("JSON_CONTAINS(")
+					builder.WriteQuoted(jsonQuery.column)
+					builder.WriteByte(',')
+					builder.AddVar(stmt, jsonQueryJoin(jsonQuery.keys))
+					builder.WriteByte(',')
+					if value, ok := jsonQuery.equalsValue.(bool); ok {
+						builder.WriteString(strconv.FormatBool(value))
+					} else {
+						stmt.AddVar(builder, jsonQuery.equalsValue)
+					}
+					builder.WriteByte(')')
 				}
 			}
 		case "postgres":
